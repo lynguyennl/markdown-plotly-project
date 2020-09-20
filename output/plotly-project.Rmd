@@ -1,0 +1,102 @@
+---
+title: "Presentation-plotly-project"
+author: "Ly Nguyen"
+date: "9/20/2020"
+output: slidy_presentation
+
+---
+
+## Introduction : COVID-19? 
+### We clearly have nothing else to talk about 
+
+<font size="3">
+
+
+- In the early months of COVID-19, I followed the country-by-country's *number of confirmed cases*, *active cases*, *recovered cases* to see if there is any interesting pattern emerging. 
+
+- Some findings were very interesting to me at the time, but since, have become common knowledge to everyone, including: 
+
+1. Death rates in traditionally developed countries are way higher than in traditionally developing ones, the latter we would assume would have been so much more badly-hit. This is still largely true now, with Africa getting COVID under control very well. 
+2. Infection rates in less politically democratic states, or formally less democratic states (i was very interested in the former communist blocks) were significantly lower. However, I have noticed this is no longer true ;(. 
+
+- Sadly, I had to temporarily abandon this project because of how time-consuming it was, and I, at that time, and now, still have no clue how to effectively mine the data automatically. Please let me know if you have a way to do it. 
+- All data is from https://www.worldometers.info/coronavirus/ 
+
+
+</font>
+
+## About the plot 
+### Time series of Active Cases vs Recovered Cases 
+<font size="4">
+
+
+- In the space of this exercise, I will only plot a time-series graph of **difference between the active cases & recovered cases** over time (sadly, only from February to June 2020) because I think this number best reflects the severity of the situation and whether the country has the disease under control or not. 
+
+- If **active cases - recovered cases** exhibits a downward trend, and eventually gets to negative, COVID is under control. 
+
+- I also split the data into **Region**, as specified by the UN, to see which regions have been most effective. 
+
+- As the USA, at the time of data collection, accounted for almost half of the world's infected cases, I decided to take it out as a separate region, so as not to skew the data.
+- Hope you find this interesting. I'm done talking. 
+
+
+</font>
+
+## Finally the plot
+<center>
+```{r echo=FALSE, fig.align='center', fig.width =10, fig.height=6, cache=TRUE, cache.comments=FALSE, comment=FALSE, warning=FALSE}
+library(readxl)
+library(plotly)
+library(dplyr)
+library(RColorBrewer)
+library(lubridate)
+
+setwd("C:/Users/Ly Nguyen/Learning/Courses/John Hopkins - R/9. Developing Data Products/markdown-plotly-project")
+covid <- read_excel("data/Covid Compiled Data_vertical.xlsx")
+char <- read_excel("data/Country Characteristics.xlsx")
+covid$'Death Rates %' <- round(covid$`Death Rates` * 100, 2)
+covid <- covid[covid[["Date"]] <= "2020-06-19", ]
+covid <- merge(covid, char, by='Country Name')
+ag <- aggregate(covid$`Active Cases`- covid$Recovered ~ covid$Date+covid$`Region (by UN)`, list(covid$`Region (by UN)`), sum, na.rm=T)
+names(ag) <- c("Date", "Region(byUN)", "ActiveCases-Recovered")
+ag <- ag[order(ag$Date, decreasing=F), ]
+
+ag$decimalDate <- decimal_date(ag$Date)
+
+accumulate_by <- function(dat, var) {
+        var <- lazyeval::f_eval(var, dat)
+        lvls <- plotly:::getLevels(var)
+        dats <- lapply(seq_along(lvls), function(x) {
+                cbind(dat[var %in% lvls[seq(1, x)], ], frame = lvls[[x]])
+        })
+        dplyr::bind_rows(dats)
+} 
+
+ag <- ag %>% accumulate_by(~decimalDate)
+
+g <- ag %>% plot_ly(x=~Date, y=~`ActiveCases-Recovered`, 
+             split=~`Region(byUN)`, 
+             frame=~frame, 
+             type="scatter", 
+             mode="lines"
+             ) %>% 
+        layout(title = "Active Cases - Recovered Cases Across Region from 02/2020 to 06/2020",
+                xaxis = list(type = "date",
+                        range=c('2020-02-15', '2020-06-19'),
+                        rangebreaks = list(list(values=c("2020-2=02-15", "2020-06-19"))),
+                        zeroline = F
+                        )
+               
+        ) %>% 
+        animation_opts(frame = 60,
+                       transition = 0, 
+                       redraw = FALSE
+                       ) %>%
+        animation_slider(hide = T
+                         ) %>%
+        animation_button(x = 1.5, xanchor = "right", 
+                         y = 0, yanchor = "bottom"
+                         )
+g
+```
+</center>
